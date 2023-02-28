@@ -1,9 +1,11 @@
 use crate::common::reserved::{OperatorInfo, ReservedToken};
 use std::option::Option;
 
-const CHIA_RESERVED_TOKENS: [ReservedToken; 66] = [
+const CHIA_RESERVED_TOKENS: [ReservedToken; 69] = [
     ReservedToken::Char(';'),
+    ReservedToken::Char(':'),
     ReservedToken::Char('\n'),
+    ReservedToken::Char('\r'),
     ReservedToken::Char('{'),
     ReservedToken::Char('}'),
     ReservedToken::Char('\''),
@@ -32,6 +34,16 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 66] = [
     ),
     ReservedToken::Operator(
         ".",
+        OperatorInfo {
+            is_unary: true,
+            is_prefix: false,
+            is_postfix: true,
+            is_binary: false,
+            is_ternary: false,
+        },
+    ),
+    ReservedToken::Operator(
+        "::",
         OperatorInfo {
             is_unary: true,
             is_prefix: false,
@@ -403,7 +415,7 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 66] = [
     ReservedToken::Keyword("sizeof"),
 ];
 
-pub fn find_reserved_token(s: &str) -> Option<&ReservedToken> {
+pub fn find_reserved_token<'a>(s: &str) -> Option<&'a ReservedToken<'a>> {
     for token in &CHIA_RESERVED_TOKENS {
         match token {
             ReservedToken::Char(c) => {
