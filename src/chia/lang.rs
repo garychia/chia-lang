@@ -1,4 +1,4 @@
-use crate::lexer::reserved::{OperatorInfo, ReservedToken};
+use crate::common::reserved::{OperatorInfo, ReservedToken};
 use std::option::Option;
 
 const CHIA_RESERVED_TOKENS: [ReservedToken; 66] = [

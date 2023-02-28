@@ -1,13 +1,18 @@
 mod chia;
-mod lexer;
+mod common;
+
+const VERSION: (u32, u32, u32) = (0, 0, 1);
 
 fn main() {
-    println!("Chia Compiler -- Version: 0.0.1");
+    println!(
+        "Chia Compiler -- Version: {}.{}.{}",
+        VERSION.0, VERSION.1, VERSION.2
+    );
     if let Some(token) = chia::lang::find_reserved_token("{") {
         match &token {
-            lexer::reserved::ReservedToken::Char(c) => println!("Reserved Char: {}", c),
-            &lexer::reserved::ReservedToken::Operator(op, _) => println!("Operator: {}", op),
-            lexer::reserved::ReservedToken::Keyword(keyword) => println!("Keyword: {}", keyword),
+            common::reserved::ReservedToken::Char(c) => println!("Reserved Char: {}", c),
+            common::reserved::ReservedToken::Operator(op, _) => println!("Operator: {}", op),
+            common::reserved::ReservedToken::Keyword(keyword) => println!("Keyword: {}", keyword),
         }
     }
 }
