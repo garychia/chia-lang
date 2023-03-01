@@ -20,3 +20,22 @@ impl Position {
         }
     }
 }
+
+impl ToString for Position {
+    fn to_string(&self) -> String {
+        format!(
+            "(Line: {}, Column: {}, Index: {})",
+            self.line, self.column, self.index
+        )
+    }
+}
+
+impl ToString for PositionRange {
+    fn to_string(&self) -> String {
+        format!(
+            "{{Start: {}, End: {}}}",
+            self.start.to_string(),
+            self.end.to_string()
+        )
+    }
+}

@@ -6,8 +6,6 @@ use std::io::Read;
 use std::{process::exit, vec::Vec};
 
 use chia::lexer::Lexer;
-use common::reserved::ReservedToken;
-use common::token::Token;
 
 const VERSION: (u32, u32, u32) = (0, 0, 1);
 
@@ -79,11 +77,13 @@ fn read_files(setting: &Setting) -> Result<Vec<String>, ()> {
     Ok(src_code_strs)
 }
 
-fn process_src_code(src_contents: Vec<String>) {
+fn process_src_code(setting: &Setting, src_contents: Vec<String>) {
     for content in &src_contents {
         let mut lexer = Lexer::new(content);
-        while let Some((token, _)) = lexer.next_token() {
-            println!("{}", token.to_string());
+        while let Some((token, range)) = lexer.next_token() {
+            if setting.verbose {
+                println!("Token: {}, Range: {}", token.to_string(), range.to_string());
+            }
         }
     }
 }
@@ -98,7 +98,7 @@ fn main() {
         exit(1);
     }
     if let Ok(src_contents) = read_files(&setting) {
-        process_src_code(src_contents);
+        process_src_code(&setting, src_contents);
     } else {
         exit(1);
     }

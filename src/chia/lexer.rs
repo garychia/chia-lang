@@ -1,7 +1,7 @@
 use super::lang::find_reserved_token;
 use crate::common::{
     position::{Position, PositionRange},
-    token::Token,
+    token::{NumberInfo, Token},
 };
 
 pub struct Lexer<'a> {
@@ -100,9 +100,53 @@ impl<'a> Lexer<'a> {
         None
     }
 
+    fn scan_number(&mut self, whole_number: bool) -> Option<PositionRange> {
+        let pos_before = self.position.clone();
+        let mut last_pos = self.position.clone();
+        let mut end_idx = None;
+        while let Some(current) = self.peek() {
+            if find_reserved_token(&String::from(current)).is_some() || current.is_whitespace() {
+                end_idx = Some(self.position.index);
+                break;
+            } else if current == '.' {
+                if !whole_number {
+                    end_idx = Some(self.position.index);
+                }
+                break;
+            } else if current == 'f' {
+                if whole_number {
+                    break;
+                }
+                last_pos = self.position.clone();
+                self.consume();
+                match self.peek() {
+                    Some(c) => {
+                        if find_reserved_token(&String::from(c)).is_some() || c.is_whitespace() {
+                            end_idx = Some(self.position.index);
+                        }
+                    }
+                    _ => end_idx = Some(self.position.index),
+                }
+                break;
+            } else if !current.is_digit(10) {
+                break;
+            }
+            last_pos = self.position.clone();
+            self.consume();
+        }
+        if end_idx.is_some() {
+            return Some(PositionRange {
+                start: pos_before,
+                end: last_pos,
+            });
+        }
+        self.position = pos_before;
+        None
+    }
+
     pub fn next_token(&mut self) -> Option<(Token<'a>, PositionRange)> {
         while let Some(c) = self.peek() {
-            match c.is_whitespace() || c == '\r' {
+            match (c.is_whitespace() || c == '\r') && c != '\n' {
                 true => self.consume(),
                 _ => break,
             }
@@ -138,6 +182,43 @@ impl<'a> Lexer<'a> {
                     end: last,
                 },
             ));
+        }
+        match self.scan_number(true) {
+            Some(whole_range) => match self.peek() {
+                Some('.') => {
+                    self.consume();
+                    match self.scan_number(false) {
+                        Some(fractional_range) => {
+                            return Some((
+                                Token::Number(NumberInfo {
+                                    whole_number: &self.src_code
+                                        [whole_range.start.index..whole_range.end.index + 1],
+                                    fractional_part: Some(
+                                        &self.src_code[fractional_range.start.index
+                                            ..fractional_range.end.index + 1],
+                                    ),
+                                }),
+                                PositionRange {
+                                    start: whole_range.start,
+                                    end: fractional_range.end,
+                                },
+                            ))
+                        }
+                        _ => return None,
+                    }
+                }
+                _ => {
+                    return Some((
+                        Token::Number(NumberInfo {
+                            whole_number: &self.src_code
+                                [whole_range.start.index..whole_range.end.index + 1],
+                            fractional_part: None,
+                        }),
+                        whole_range,
+                    ))
+                }
+            },
+            _ => {}
         }
         while let Some(c) = self.peek() {
             if find_reserved_token(&String::from(c)).is_some() || c.is_whitespace() {

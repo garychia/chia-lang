@@ -1,9 +1,10 @@
 use crate::common::reserved::{OperatorInfo, ReservedToken};
 use std::option::Option;
 
-const CHIA_RESERVED_TOKENS: [ReservedToken; 69] = [
+const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Char(';'),
     ReservedToken::Char(':'),
+    ReservedToken::Char(','),
     ReservedToken::Char('\n'),
     ReservedToken::Char('\r'),
     ReservedToken::Char('{'),
