@@ -83,16 +83,7 @@ fn process_src_code(src_contents: Vec<String>) {
     for content in &src_contents {
         let mut lexer = Lexer::new(content);
         while let Some((token, _)) = lexer.next_token() {
-            match token {
-                Token::Char(c) => println!("Char: {}", c),
-                Token::Reserved(reserved_token) => match reserved_token {
-                    ReservedToken::Char(c) => println!("Reserved Char: {}", c),
-                    ReservedToken::Keyword(keyword) => println!("Keyword: {}", keyword),
-                    ReservedToken::Operator(op, _) => println!("Operator: {}", op),
-                },
-                Token::Identifier(name) => println!("Identifier: {}", name),
-                _ => {},
-            }
+            println!("{}", token.to_string());
         }
     }
 }
