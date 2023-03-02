@@ -306,6 +306,21 @@ impl<'a> Lexer<'a> {
                     },
                 )));
             }
+            if self
+                .src_code
+                .chars()
+                .nth(start_pos.index)
+                .unwrap()
+                .is_digit(10)
+            {
+                return Err(LexerError {
+                    description: format!("Invalid identifier found."),
+                    position_range: PositionRange {
+                        start: start_pos,
+                        end: last,
+                    },
+                });
+            }
             return Ok(Some((
                 Token::Identifier(&self.src_code[start_pos.index..self.position.index]),
                 PositionRange {
