@@ -80,7 +80,11 @@ fn process_src_code(setting: &Setting, src_contents: Vec<String>) {
         let mut lexer = Lexer::new(content);
         while let Some((token, range)) = lexer.next_token() {
             if setting.verbose {
-                println!("Token: {}\nPosition: {}", token.to_string(), range.to_string());
+                println!(
+                    "Token: {}\nPosition: {}",
+                    token.to_string(),
+                    range.to_string()
+                );
             }
         }
     }
