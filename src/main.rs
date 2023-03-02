@@ -78,13 +78,24 @@ fn read_files(setting: &Setting) -> Result<Vec<String>, String> {
 fn process_src_code(setting: &Setting, src_contents: Vec<String>) {
     for content in &src_contents {
         let mut lexer = Lexer::new(content);
-        while let Some((token, range)) = lexer.next_token() {
-            if setting.verbose {
-                println!(
-                    "Token: {}\nPosition: {}",
-                    token.to_string(),
-                    range.to_string()
-                );
+        let mut all_tokens = Vec::new();
+        loop {
+            match lexer.next_token() {
+                Ok(None) => break,
+                Ok(Some((token, pos_info))) => {
+                    if setting.verbose {
+                        println!(
+                            "Token: {}\nPosition: {}",
+                            token.to_string(),
+                            pos_info.to_string()
+                        );
+                    }
+                    all_tokens.push(token);
+                }
+                Err(err) => println!(
+                    "Lexer has encountered the following error:\n{}",
+                    err.to_string()
+                ),
             }
         }
     }

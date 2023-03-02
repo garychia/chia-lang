@@ -4,6 +4,21 @@ use crate::common::{
     token::{NumberInfo, Token},
 };
 
+pub struct LexerError {
+    description: String,
+    position_range: PositionRange,
+}
+
+impl ToString for LexerError {
+    fn to_string(&self) -> String {
+        format!(
+            "{} (Position: {})",
+            self.description,
+            self.position_range.to_string()
+        )
+    }
+}
+
 pub struct Lexer<'a> {
     position: Position,
     src_code: &'a str,
@@ -13,7 +28,7 @@ impl<'a> Lexer<'a> {
     pub fn new(src_code: &'a str) -> Lexer<'a> {
         Lexer {
             position: Position::new(),
-            src_code: src_code,
+            src_code,
         }
     }
 
@@ -35,69 +50,94 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_until(&mut self, f: fn(Option<char>, char) -> bool) -> Option<PositionRange> {
-        let pos_before = self.position.clone();
+    fn read_until(
+        &mut self,
+        f: fn(Option<char>, char) -> bool,
+        until_end: bool,
+    ) -> Option<PositionRange> {
+        let start_pos = self.position.clone();
         let mut last_char: Option<char> = None;
         let mut last_pos = self.position.clone();
+        let mut found = false;
         while let Some(current) = self.peek() {
             last_pos = self.position.clone();
             self.consume();
             if f(last_char, current) {
+                found = true;
                 break;
             }
             last_char = Some(current);
         }
-        if last_char.is_some() {
+        if found || !found && until_end {
             return Some(PositionRange {
-                start: pos_before,
+                start: start_pos,
                 end: last_pos,
             });
         }
-        self.position = pos_before;
+        self.position = start_pos;
         None
     }
 
-    fn scan_str(&mut self, start_pos: Position) -> Option<(Token<'a>, PositionRange)> {
+    fn scan_str(
+        &mut self,
+        start_pos: Position,
+    ) -> Result<Option<(Token<'a>, PositionRange)>, LexerError> {
         let first_char = self.src_code.chars().nth(start_pos.index);
-        match first_char {
-            Some(c) => {
-                if c != '\"' {
-                    return None;
-                }
-            }
-            _ => return None,
+        if first_char.is_none() || first_char.unwrap() != '\"' {
+            return Ok(None);
         }
-        if let Some(range) = self.read_until(|last_char, current| {
-            current == '\"' && (last_char.is_none() || last_char.unwrap() != '\\')
-        }) {
-            return Some((
+        if let Some(range) = self.read_until(
+            |last_char, current| {
+                current == '\"' && (last_char.is_none() || last_char.unwrap() != '\\')
+            },
+            false,
+        ) {
+            return Ok(Some((
                 Token::Str(&self.src_code[start_pos.index..range.end.index + 1]),
                 PositionRange {
                     start: start_pos,
                     end: range.end,
                 },
-            ));
+            )));
         }
-        None
+        Err(LexerError {
+            description: format!("A string literal must be closed with '\"'."),
+            position_range: PositionRange {
+                start: start_pos.clone(),
+                end: start_pos,
+            },
+        })
     }
 
-    fn scan_char(&mut self, start_pos: Position) -> Option<(Token<'a>, PositionRange)> {
+    fn scan_char(
+        &mut self,
+        start_pos: Position,
+    ) -> Result<Option<(Token<'a>, PositionRange)>, LexerError> {
         let first_char = self.src_code.chars().nth(start_pos.index);
         if first_char.is_none() || first_char.unwrap() != '\'' {
-            return None;
+            return Ok(None);
         }
-        if let Some(range) = self.read_until(|last_char, current| {
-            current == '\'' && (last_char.is_none() || last_char.unwrap() != '\\')
-        }) {
-            return Some((
+        if let Some(range) = self.read_until(
+            |last_char, current| {
+                current == '\'' && (last_char.is_none() || last_char.unwrap() != '\\')
+            },
+            false,
+        ) {
+            return Ok(Some((
                 Token::Char(&self.src_code[start_pos.index..range.end.index + 1]),
                 PositionRange {
                     start: start_pos,
                     end: range.end,
                 },
-            ));
+            )));
         }
-        None
+        Err(LexerError {
+            description: format!("A char literal must be closed with '\''."),
+            position_range: PositionRange {
+                start: start_pos.clone(),
+                end: start_pos,
+            },
+        })
     }
 
     fn scan_number(&mut self, whole_number: bool) -> Option<PositionRange> {
@@ -144,7 +184,19 @@ impl<'a> Lexer<'a> {
         None
     }
 
-    pub fn next_token(&mut self) -> Option<(Token<'a>, PositionRange)> {
+    fn handle_result(&mut self, result: &Result<Option<(Token<'a>, PositionRange)>, LexerError>) {
+        if result.is_ok() {
+            return;
+        }
+        while let Some(c) = self.peek() {
+            match c {
+                ';' => break,
+                _ => self.consume(),
+            }
+        }
+    }
+
+    pub fn next_token(&mut self) -> Result<Option<(Token<'a>, PositionRange)>, LexerError> {
         while let Some(c) = self.peek() {
             match (c.is_whitespace() || c == '\r') && c != '\n' {
                 true => self.consume(),
@@ -165,14 +217,18 @@ impl<'a> Lexer<'a> {
         }
         if let Some(last) = last_pos {
             let result = self.scan_str(start_pos.clone());
-            if result.is_some() {
-                return result;
+            self.handle_result(&result);
+            match result {
+                Ok(None) => {}
+                _ => return result,
             }
             let result = self.scan_char(start_pos.clone());
-            if result.is_some() {
-                return result;
+            self.handle_result(&result);
+            match result {
+                Ok(None) => {}
+                _ => return result,
             }
-            return Some((
+            return Ok(Some((
                 Token::Reserved(
                     find_reserved_token(&self.src_code[start_pos.index..self.position.index])
                         .unwrap(),
@@ -181,7 +237,7 @@ impl<'a> Lexer<'a> {
                     start: start_pos,
                     end: last,
                 },
-            ));
+            )));
         }
         match self.scan_number(true) {
             Some(whole_range) => match self.peek() {
@@ -189,7 +245,7 @@ impl<'a> Lexer<'a> {
                     self.consume();
                     match self.scan_number(false) {
                         Some(fractional_range) => {
-                            return Some((
+                            return Ok(Some((
                                 Token::Number(NumberInfo {
                                     whole_number: &self.src_code
                                         [whole_range.start.index..whole_range.end.index + 1],
@@ -202,20 +258,28 @@ impl<'a> Lexer<'a> {
                                     start: whole_range.start,
                                     end: fractional_range.end,
                                 },
-                            ))
+                            )));
                         }
-                        _ => return None,
+                        _ => {
+                            return Err(LexerError {
+                                description: format!("Number literal is invalid."),
+                                position_range: PositionRange {
+                                    start: start_pos,
+                                    end: self.position.clone(),
+                                },
+                            });
+                        }
                     }
                 }
                 _ => {
-                    return Some((
+                    return Ok(Some((
                         Token::Number(NumberInfo {
                             whole_number: &self.src_code
                                 [whole_range.start.index..whole_range.end.index + 1],
                             fractional_part: None,
                         }),
                         whole_range,
-                    ))
+                    )));
                 }
             },
             _ => {}
@@ -234,22 +298,22 @@ impl<'a> Lexer<'a> {
             if let Some(token) =
                 find_reserved_token(&self.src_code[start_pos.index..self.position.index])
             {
-                return Some((
+                return Ok(Some((
                     Token::Reserved(token),
                     PositionRange {
                         start: start_pos,
                         end: last,
                     },
-                ));
+                )));
             }
-            return Some((
+            return Ok(Some((
                 Token::Identifier(&self.src_code[start_pos.index..self.position.index]),
                 PositionRange {
                     start: start_pos,
                     end: last,
                 },
-            ));
+            )));
         }
-        None
+        Ok(None)
     }
 }
