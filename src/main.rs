@@ -31,7 +31,7 @@ fn print_usage() {
     println!("{}", HELP_INFO);
 }
 
-fn parse_cmd_args() -> Setting {
+fn parse_args() -> Setting {
     let mut verbose = false;
     let mut input_files = Vec::new();
     for arg in std::env::args().skip(1) {
@@ -46,7 +46,7 @@ fn parse_cmd_args() -> Setting {
     }
 }
 
-fn read_files(setting: &Setting) -> Result<Vec<String>, ()> {
+fn read_files(setting: &Setting) -> Result<Vec<String>, String> {
     let mut src_code_strs = Vec::new();
     for file_name in &setting.input_files {
         match File::open(file_name) {
@@ -55,22 +55,20 @@ fn read_files(setting: &Setting) -> Result<Vec<String>, ()> {
                 match f.read_to_string(&mut content) {
                     Ok(_) => src_code_strs.push(content),
                     Err(err) => {
-                        println!(
+                        return Err(format!(
                             "Unable to read the file: {}\nReason: {}",
                             file_name,
                             err.to_string()
-                        );
-                        return Err(());
+                        ));
                     }
                 }
             }
             Err(err) => {
-                println!(
+                return Err(format!(
                     "Unable to open the file: {}\nReason: {}",
                     file_name,
                     err.to_string()
-                );
-                return Err(());
+                ));
             }
         }
     }
@@ -82,7 +80,7 @@ fn process_src_code(setting: &Setting, src_contents: Vec<String>) {
         let mut lexer = Lexer::new(content);
         while let Some((token, range)) = lexer.next_token() {
             if setting.verbose {
-                println!("Token: {}, Range: {}", token.to_string(), range.to_string());
+                println!("Token: {}\nPosition: {}", token.to_string(), range.to_string());
             }
         }
     }
@@ -91,15 +89,17 @@ fn process_src_code(setting: &Setting, src_contents: Vec<String>) {
 fn main() {
     print_info();
 
-    let setting = parse_cmd_args();
+    let setting = parse_args();
 
     if setting.input_files.is_empty() {
         print_usage();
         exit(1);
     }
-    if let Ok(src_contents) = read_files(&setting) {
-        process_src_code(&setting, src_contents);
-    } else {
-        exit(1);
+    match read_files(&setting) {
+        Ok(src_contents) => process_src_code(&setting, src_contents),
+        Err(description) => {
+            println!("{}", description);
+            exit(1);
+        }
     }
 }
