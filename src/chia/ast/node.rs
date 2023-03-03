@@ -1,6 +1,17 @@
 use crate::common::token::Token;
 use std::vec::Vec;
 
+pub struct ProgramInfo<'a> {
+    name: String,
+    var_fn_defs: Vec<Box<ASTNode<'a>>>,
+}
+
+impl<'a> ProgramInfo<'a> {
+    pub fn new(name: String, var_fn_defs: Vec<Box<ASTNode<'a>>>) -> ProgramInfo<'a> {
+        ProgramInfo { name, var_fn_defs }
+    }
+}
+
 pub struct TypeDef<'a> {
     type_name: &'a Token<'a>,
     definition: Box<ASTNode<'a>>,
@@ -134,9 +145,11 @@ impl<'a> ControlFlowInfo<'a> {
 }
 
 pub enum ASTNode<'a> {
+    Program(ProgramInfo<'a>),
     TypeDef(TypeDef<'a>),
     StructDef(StructDef<'a>),
     EnumDef(EnumDef<'a>),
+    Tuple(Vec<Box<ASTNode<'a>>>),
     Number(&'a Token<'a>),
     Identifier(&'a Token<'a>),
     Expression(Box<ASTNode<'a>>),
