@@ -48,6 +48,32 @@ impl<'a> EnumDef<'a> {
     }
 }
 
+pub struct TypeInfo<'a> {
+    is_static: bool,
+    is_mut: bool,
+    is_volatile: bool,
+    is_pointer: bool,
+    base_type: Box<ASTNode<'a>>,
+}
+
+impl<'a> TypeInfo<'a> {
+    pub fn new(
+        is_static: bool,
+        is_mut: bool,
+        is_volatile: bool,
+        is_pointer: bool,
+        base_type: Box<ASTNode<'a>>,
+    ) -> TypeInfo<'a> {
+        TypeInfo {
+            is_static,
+            is_mut,
+            is_volatile,
+            is_pointer,
+            base_type,
+        }
+    }
+}
+
 pub struct TypeVarPair<'a> {
     type_of_var: Box<ASTNode<'a>>,
     identifier: Box<ASTNode<'a>>,
@@ -149,6 +175,7 @@ pub enum ASTNode<'a> {
     TypeDef(TypeDef<'a>),
     StructDef(StructDef<'a>),
     EnumDef(EnumDef<'a>),
+    Type(TypeInfo<'a>),
     Tuple(Vec<Box<ASTNode<'a>>>),
     Number(&'a Token<'a>),
     Identifier(&'a Token<'a>),
@@ -163,6 +190,10 @@ pub enum ASTNode<'a> {
 impl<'a> ASTNode<'a> {
     pub fn new_type_def(type_def: TypeDef<'a>) -> ASTNode<'a> {
         Self::TypeDef(type_def)
+    }
+
+    pub fn new_type(type_info: TypeInfo<'a>) -> ASTNode<'a> {
+        Self::Type(type_info)
     }
 
     pub fn new_number(token: &'a Token<'a>) -> ASTNode<'a> {

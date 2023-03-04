@@ -1,6 +1,6 @@
 use crate::common::{reserved::ReservedToken, token::Token};
 
-use super::ast::node::{ASTNode, ProgramInfo};
+use super::ast::node::{ASTNode, ProgramInfo, TypeInfo};
 
 pub struct ParserError<'a, 'b> {
     description: String,
@@ -65,7 +65,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                         description: format!("Expected ')' or ','."),
                         token,
                     });
-                },
+                }
             }
             self.consume();
             if reach_end {
@@ -82,37 +82,107 @@ impl<'a, 'b> Parser<'a, 'b> {
         Ok(Box::new(ASTNode::Tuple(inner_types)))
     }
 
+    fn parse_type_qualifiers(&mut self) -> (bool, bool) {
+        let mut is_mut = false;
+        let mut is_volatile = false;
+        while let Some(token) = self.peek() {
+            match token {
+                Token::Reserved(ReservedToken::Keyword("mut")) => is_mut = true,
+                Token::Reserved(ReservedToken::Keyword("volatile")) => is_volatile = true,
+                _ => break,
+            }
+            self.consume();
+        }
+        (is_mut, is_volatile)
+    }
+
+    fn parse_static(&mut self) -> bool {
+        let mut is_static = false;
+        while let Some(token) = self.peek() {
+            match token {
+                Token::Reserved(ReservedToken::Keyword("static")) => is_static = true,
+                _ => break,
+            }
+            self.consume();
+        }
+        is_static
+    }
+
     fn parse_type(&mut self) -> Result<Box<ASTNode<'a>>, ParserError<'a, 'b>> {
+        let is_static = self.parse_static();
+        let (is_mut, is_volatile) = self.parse_type_qualifiers();
+        let mut base_type = None;
         match self.peek() {
             Some(token) => match token {
                 Token::Identifier(_) => {
                     self.consume();
-                    Ok(Box::new(ASTNode::Identifier(token)))
+                    base_type = Some(Box::new(ASTNode::Type(TypeInfo::new(
+                        is_static,
+                        is_mut,
+                        is_volatile,
+                        false,
+                        Box::new(ASTNode::Identifier(token)),
+                    ))));
                 }
                 Token::Reserved(ReservedToken::Char('(')) => match self.parse_tuple_type() {
-                    Ok(node) => Ok(node),
-                    Err(err) => Err(err),
+                    Ok(node) => return Ok(node),
+                    Err(err) => return Err(err),
                 },
-                _ => Err(ParserError {
-                    description: format!("Expected an identifier or tuple."),
-                    token: self.peek(),
-                }),
+                _ => {
+                    return Err(ParserError {
+                        description: format!("Expected an identifier or tuple."),
+                        token: self.peek(),
+                    })
+                }
             },
+            _ => {
+                return Err(ParserError {
+                    description: format!("Expected an identifier or tuple."),
+                    token: None,
+                })
+            }
+        }
+        while let Some(token) = self.peek() {
+            match token {
+                Token::Reserved(ReservedToken::Operator("*", _)) => {
+                    self.consume();
+                    let (is_mut, is_volatile) = self.parse_type_qualifiers();
+                    base_type = match base_type {
+                        None => {
+                            return Err(ParserError {
+                                description: format!("Invalid pointer notation"),
+                                token: Some(token),
+                            })
+                        }
+                        Some(base) => Some(Box::new(ASTNode::new_type(TypeInfo::new(
+                            false,
+                            is_mut,
+                            is_volatile,
+                            true,
+                            base,
+                        )))),
+                    };
+                }
+                _ => break,
+            }
+        }
+        match base_type {
+            Some(base) => Ok(base),
             _ => Err(ParserError {
-                description: format!("Expected an identifier or tuple."),
+                description: format!("Serious internal error."),
                 token: None,
             }),
         }
     }
 
-    fn parse_var_def(&mut self) -> Result<Option<Box<ASTNode<'a>>>, ParserError<'a, 'b>> {
+    fn parse_decl(&mut self) -> Result<Option<Box<ASTNode<'a>>>, ParserError<'a, 'b>> {
         Ok(None)
     }
 
     pub fn parse(&mut self) -> ASTNode<'a> {
         let mut definitions = Vec::new();
         loop {
-            match self.parse_var_def() {
+            match self.parse_decl() {
                 Ok(None) => break,
                 Ok(Some(node)) => definitions.push(node),
                 _ => break,

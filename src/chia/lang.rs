@@ -393,7 +393,7 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
             is_ternary: true,
         },
     ),
-    ReservedToken::Keyword("const"),
+    ReservedToken::Keyword("mut"),
     ReservedToken::Keyword("volatile"),
     ReservedToken::Keyword("static"),
     ReservedToken::Keyword("extern"),
