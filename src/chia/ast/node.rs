@@ -1,4 +1,4 @@
-use crate::common::token::Token;
+use crate::common::{token::Token, reserved::ReservedToken};
 use std::vec::Vec;
 
 pub struct ProgramInfo<'a> {
@@ -178,6 +178,7 @@ pub enum ASTNode<'a> {
     Type(TypeInfo<'a>),
     Tuple(Vec<Box<ASTNode<'a>>>),
     Number(&'a Token<'a>),
+    String(&'a Token<'a>),
     Identifier(&'a Token<'a>),
     Expression(Box<ASTNode<'a>>),
     Function(FnDef<'a>),
@@ -185,6 +186,9 @@ pub enum ASTNode<'a> {
     Variable(VarDef<'a>),
     Sequence(Vec<Box<ASTNode<'a>>>),
     ControlFlow(ControlFlowInfo<'a>),
+    PrefixOperation(Box<ASTNode<'a>>),
+    PostfixOperation(Box<ASTNode<'a>>),
+    BinaryOperation(&'a ReservedToken<'a>, Box<ASTNode<'a>>, Box<ASTNode<'a>>),
 }
 
 impl<'a> ASTNode<'a> {
