@@ -1,6 +1,6 @@
 use crate::common::{reserved::ReservedToken, token::Token};
 
-use super::ast::node::{ASTNode, FnDef, ProgramInfo, TypeInfo, TypeVarPair, VarDef, FnCall};
+use super::ast::node::{ASTNode, FnCall, FnDef, ProgramInfo, TypeInfo, TypeVarPair, VarDef};
 
 pub struct ParserError<'a, 'b> {
     description: String,
@@ -33,7 +33,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         self.token_idx += 1;
     }
 
-    fn parse_tuple_type(&mut self) -> Result<Box<ASTNode<'a>>, ParserError<'a, 'b>> {
+    fn parse_tuple_type(&mut self) -> Result<Box<ASTNode<'a, 'b>>, ParserError<'a, 'b>> {
         let last_idx = self.token_idx;
         match self.peek() {
             Some(Token::Reserved(ReservedToken::Char('('))) => self.consume(),
@@ -96,16 +96,24 @@ impl<'a, 'b> Parser<'a, 'b> {
         (is_mut, is_volatile)
     }
 
-    fn parse_static(&mut self) -> bool {
-        let mut is_static = false;
-        while let Some(token) = self.peek() {
-            match token {
-                Token::Reserved(ReservedToken::Keyword("static")) => is_static = true,
-                _ => break,
-            }
-            self.consume();
+    fn parse_keyword(&mut self, keyword: &str) -> Option<&'a Token<'b>> {
+        match self.peek() {
+            Some(token) => match token {
+                Token::Reserved(ReservedToken::Keyword(token_keyword)) => {
+                    if token_keyword.eq(&keyword) {
+                        self.consume();
+                        return Some(token);
+                    }
+                    None
+                }
+                _ => None,
+            },
+            _ => None,
         }
-        is_static
+    }
+
+    fn parse_static(&mut self) -> bool {
+        self.parse_keyword("static").is_some()
     }
 
     fn peek_identifier(&mut self) -> Option<&'a Token<'b>> {
@@ -118,7 +126,60 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    fn parse_expr_parantheses(&mut self) -> Result<Box<ASTNode<'a>>, ParserError<'a, 'b>> {
+    fn parse_expr_parantheses(&mut self) -> Result<Box<ASTNode<'a, 'b>>, ParserError<'a, 'b>> {
+        let last_idx = self.token_idx;
+        let token = self.peek();
+        match token {
+            Some(Token::Reserved(ReservedToken::Char('('))) => self.consume(),
+            _ => {
+                return Err(ParserError {
+                    description: format!("Expected '('."),
+                    token,
+                })
+            }
+        }
+        let inner = self.parse_expr();
+        match inner {
+            Ok(_) => {}
+            err => {
+                self.token_idx = last_idx;
+                return err;
+            }
+        }
+        let token = self.peek();
+        match token {
+            Some(Token::Reserved(ReservedToken::Char(')'))) => self.consume(),
+            _ => {
+                self.token_idx = last_idx;
+                return Err(ParserError {
+                    description: format!("Expected ')'."),
+                    token,
+                });
+            }
+        }
+        inner
+    }
+
+    fn parse_prefix_operators(&mut self) -> Vec<&'a ReservedToken<'b>> {
+        let mut prefix_operators = Vec::new();
+        while let Some(token) = self.peek() {
+            match token {
+                Token::Reserved(reserved_token) => match reserved_token {
+                    ReservedToken::Operator(_, info) => match info.is_prefix {
+                        true => prefix_operators.push(*reserved_token),
+                        _ => break,
+                    },
+                    _ => break,
+                },
+                _ => break,
+            }
+            self.consume();
+        }
+        prefix_operators
+    }
+
+    fn parse_tuple(&mut self) -> Result<Vec<Box<ASTNode<'a, 'b>>>, ParserError<'a, 'b>> {
+        let last_idx = self.token_idx;
         match self.peek() {
             Some(Token::Reserved(ReservedToken::Char('('))) => self.consume(),
             _ => {
@@ -128,113 +189,144 @@ impl<'a, 'b> Parser<'a, 'b> {
                 })
             }
         }
-        let inner = self.parse_expr();
-        match inner {
-            Ok(_) => {}
-            err => return err,
-        }
-        match self.peek() {
-            Some(Token::Reserved(ReservedToken::Char(')'))) => self.consume(),
-            _ => {
-                return Err(ParserError {
-                    description: format!("Expected ')'."),
-                    token: self.peek(),
-                })
+        let mut arguments = Vec::new();
+        let mut reach_end = false;
+        while !reach_end {
+            let token = self.peek();
+            match token {
+                Some(Token::Reserved(ReservedToken::Char(')'))) => reach_end = true,
+                Some(Token::Reserved(ReservedToken::Char(','))) => {
+                    if arguments.is_empty() {
+                        self.token_idx = last_idx;
+                        return Err(ParserError {
+                            description: format!("Expected ',' or ')'."),
+                            token,
+                        });
+                    }
+                }
+                _ => {
+                    self.token_idx = last_idx;
+                    return Err(ParserError {
+                        description: format!("Expected ',' or ')'."),
+                        token,
+                    });
+                }
+            }
+            self.consume();
+            if reach_end {
+                break;
+            }
+            match self.parse_expr() {
+                Ok(arg) => arguments.push(arg),
+                Err(err) => {
+                    self.token_idx = last_idx;
+                    return Err(err);
+                }
             }
         }
-        inner
+        Ok(arguments)
     }
 
-    fn parse_expr(&mut self) -> Result<Box<ASTNode<'a>>, ParserError<'a, 'b>> {
+    fn parse_operand(&mut self) -> Result<Option<Box<ASTNode<'a, 'b>>>, ParserError> {
+        let mut operand = None;
+        let last_idx = self.token_idx;
+        if let Some(token) = self.peek() {
+            operand = match token {
+                Token::Identifier(_) => {
+                    self.consume();
+                    match self.peek() {
+                        Some(Token::Reserved(ReservedToken::Char('('))) => {
+                            match self.parse_tuple() {
+                                Ok(args) => Some(Box::new(ASTNode::new_function_call(
+                                    FnCall::new(Box::new(ASTNode::new_identifier(token)), args),
+                                ))),
+                                Err(err) => {
+                                    self.token_idx = last_idx;
+                                    return Err(err);
+                                }
+                            }
+                        }
+                        _ => Some(Box::new(ASTNode::new_identifier(token))),
+                    }
+                }
+                Token::Number(_) => Some(Box::new(ASTNode::new_number(token))),
+                Token::Str(_) => Some(Box::new(ASTNode::String(token))),
+                _ => None,
+            };
+        }
+        if operand.is_some() {
+            self.consume();
+        }
+        Ok(operand)
+    }
+
+    fn parse_postfix_operators(&mut self) -> Vec<&'a ReservedToken<'b>> {
+        let mut postfix_operators = Vec::new();
+        while let Some(token) = self.peek() {
+            match token {
+                Token::Reserved(reserved_token) => match reserved_token {
+                    ReservedToken::Operator(_, info) => match info.is_postfix {
+                        true => postfix_operators.push(*reserved_token),
+                        _ => break,
+                    },
+                    _ => break,
+                },
+                _ => break,
+            }
+            self.consume();
+        }
+        postfix_operators
+    }
+
+    fn parse_expr(&mut self) -> Result<Box<ASTNode<'a, 'b>>, ParserError<'a, 'b>> {
         let mut operands = Vec::new();
         let mut operators = Vec::new();
         let mut operand_expected = true;
-        let idx_before = self.token_idx;
+        let last_idx = self.token_idx;
         while self.peek().is_some() {
             if operand_expected {
-                let mut prefix_operators = Vec::new();
-                while let Some(token) = self.peek() {
-                    match token {
-                        Token::Reserved(reserved_token) => {
-                            match reserved_token { 
-                                ReservedToken::Operator(op, info) => {
-                                    match info.is_prefix {
-                                        true => prefix_operators.push(reserved_token),
-                                        _ => break,
-                                    }
-                                }
-                                _ => break,
-                            }
-                        }
-                        _ => break,
+                let prefix_operators = self.parse_prefix_operators();
+                let operand = self.parse_operand();
+                if let Ok(Some(mut operand_node)) = operand {
+                    let postfix_operators = self.parse_postfix_operators();
+                    for op in postfix_operators.iter() {
+                        operand_node = Box::new(ASTNode::PostfixOperation(*op, operand_node));
                     }
-                    self.consume();
-                }
-
-                let mut operand = None;
-
-                if let Some(token) = self.peek() {
-                    operand = match token {
-                        Token::Identifier(_) => Some(ASTNode::new_identifier(token)),
-                        Token::Number(_) => Some(ASTNode::new_number(token)),
-                        Token::Str(_) => Some(ASTNode::String(token)),
-                        _ => {
-                            self.token_idx = idx_before;
-                            return Err(ParserError { description: format!("Expected an identifier, number or literal."), token: Some(token)});
-                        }
+                    for op in prefix_operators.iter().rev() {
+                        operand_node = Box::new(ASTNode::PrefixOperation(*op, operand_node));
                     }
+                    operands.push(operand_node);
+                } else {
+                    self.token_idx = last_idx;
+                    return Err(ParserError {
+                        description: format!("Expected an operand."),
+                        token: self.peek(),
+                    });
                 }
-
-                let mut postfix_operators = Vec::new();
-                while let Some(token) = self.peek() {
-                    match token {
-                        Token::Reserved(reserved_token) => {
-                            match reserved_token {
-                                ReservedToken::Operator(op, info) => {
-                                    match info.is_postfix {
-                                        true => postfix_operators.push(reserved_token),
-                                        _ => break,
-                                    }
-                                }
-                                _ => break,
-                            }
-                        }
-                        _ => break,
-                    }
-                    self.consume();
-                }
-                let mut operand_node = Box::new(operand.unwrap());
-                for op in postfix_operators.iter() {
-                    operand_node = Box::new(ASTNode::PostfixOperation(operand_node));
-                }
-                for op in prefix_operators.iter().rev() {
-                    operand_node = Box::new(ASTNode::PrefixOperation(operand_node));
-                }
-                operands.push(operand_node);
-            }
-            else {
+            } else {
                 let token = self.peek();
                 let mut succesful = false;
                 if let Some(token) = self.peek() {
                     match token {
-                        Token::Reserved(reserved_token) => {
-                            match reserved_token {
-                                ReservedToken::Operator(_, info) => {
-                                    if info.is_binary {
-                                        succesful = true;
-                                        self.consume();
-                                        operators.push(reserved_token);
-                                    }
+                        Token::Reserved(reserved_token) => match reserved_token {
+                            ReservedToken::Operator(_, info) => {
+                                if info.is_binary {
+                                    succesful = true;
+                                    self.consume();
+                                    operators.push(reserved_token);
                                 }
-                                _ => {}
                             }
-                        }
+                            _ => {}
+                        },
                         _ => {}
                     }
                 }
                 if !succesful {
-                    self.token_idx = idx_before;
-                    return Err(ParserError { description: format!("Expected an operator."), token: token });
+                    self.token_idx = last_idx;
+                    return Err(ParserError {
+                        description: format!("Expected an operator."),
+                        token: token,
+                    });
                 }
             }
             self.consume();
@@ -248,7 +340,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         Ok(operands.pop().unwrap())
     }
 
-    fn parse_type(&mut self) -> Result<Box<ASTNode<'a>>, ParserError<'a, 'b>> {
+    fn parse_type(&mut self) -> Result<Box<ASTNode<'a, 'b>>, ParserError<'a, 'b>> {
         let is_static = self.parse_static();
         let (is_mut, is_volatile) = self.parse_type_qualifiers();
         let mut base_type = None;
@@ -313,7 +405,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     fn parse_type_identifier(
         &mut self,
-    ) -> Result<(Box<ASTNode<'a>>, Box<ASTNode<'a>>), ParserError<'a, 'b>> {
+    ) -> Result<(Box<ASTNode<'a, 'b>>, Box<ASTNode<'a, 'b>>), ParserError<'a, 'b>> {
         let type_result = self.parse_type();
         match type_result {
             Err(err) => Err(err),
@@ -333,7 +425,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    fn parse_arg_list(&mut self) -> Result<Vec<TypeVarPair<'a>>, ParserError<'a, 'b>> {
+    fn parse_arg_list(&mut self) -> Result<Vec<TypeVarPair<'a, 'b>>, ParserError<'a, 'b>> {
         let idx_before = self.token_idx;
         let mut args = Vec::new();
         match self.peek() {
@@ -375,7 +467,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         Ok(args)
     }
 
-    fn parse_decl(&mut self) -> Result<Box<ASTNode<'a>>, ParserError<'a, 'b>> {
+    fn parse_decl(&mut self) -> Result<Box<ASTNode<'a, 'b>>, ParserError<'a, 'b>> {
         let type_id_result = self.parse_type_identifier();
         match type_id_result {
             Err(err) => Err(err),
@@ -401,7 +493,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    pub fn parse(&mut self) -> ASTNode<'a> {
+    pub fn parse(&mut self) -> ASTNode<'a, 'b> {
         let mut definitions = Vec::new();
         ASTNode::Program(ProgramInfo::new(self.program_name.clone(), definitions))
     }
