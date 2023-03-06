@@ -192,25 +192,19 @@ impl<'a, 'b> Parser<'a, 'b> {
         let mut arguments = Vec::new();
         let mut reach_end = false;
         while !reach_end {
+            let mut failed = false;
             let token = self.peek();
+            let parser_err = Err(ParserError {
+                description: format!("Expected ',' or ')'."),
+                token,
+            });
             match token {
                 Some(Token::Reserved(ReservedToken::Char(')'))) => reach_end = true,
-                Some(Token::Reserved(ReservedToken::Char(','))) => {
-                    if arguments.is_empty() {
-                        self.token_idx = last_idx;
-                        return Err(ParserError {
-                            description: format!("Expected ',' or ')'."),
-                            token,
-                        });
-                    }
-                }
-                _ => {
-                    self.token_idx = last_idx;
-                    return Err(ParserError {
-                        description: format!("Expected ',' or ')'."),
-                        token,
-                    });
-                }
+                Some(Token::Reserved(ReservedToken::Char(','))) => failed = arguments.is_empty(),
+                _ => failed = true,
+            }
+            if failed {
+                return parser_err;
             }
             self.consume();
             if reach_end {
@@ -331,6 +325,13 @@ impl<'a, 'b> Parser<'a, 'b> {
             }
             self.consume();
             operand_expected = !operand_expected;
+        }
+        if operand_expected {
+            self.token_idx = last_idx;
+            return Err(ParserError {
+                description: format!("Expected an operand."),
+                token: self.peek(),
+            });
         }
         while let Some(op) = operators.pop() {
             let operand1 = operands.pop().unwrap();
