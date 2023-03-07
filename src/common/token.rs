@@ -79,6 +79,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn test_token_to_string() {
         let id_name = "my_id1";
         assert_eq!(
