@@ -45,3 +45,115 @@ impl<'a> ToString for Token<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::common::reserved::{OperatorInfo, ReservedToken};
+
+    use super::{NumberInfo, Token};
+
+    #[test]
+    fn test_number_info_to_string() {
+        let whole_number = "120";
+        assert_eq!(
+            NumberInfo {
+                whole_number,
+                fractional_part: None
+            }
+            .to_string(),
+            format!("(Number, whole number: {})", whole_number)
+        );
+
+        let whole_number = "7923";
+        let fractional_part = "12443";
+        assert_eq!(
+            NumberInfo {
+                whole_number,
+                fractional_part: Some(fractional_part)
+            }
+            .to_string(),
+            format!(
+                "(Number, whole number: {}, fractional part: {})",
+                whole_number, fractional_part
+            )
+        );
+    }
+
+    fn test_token_to_string() {
+        let id_name = "my_id1";
+        assert_eq!(
+            Token::Identifier(id_name).to_string(),
+            format!("(Identifier, Name: {})", id_name)
+        );
+        let id_name = "my_id2";
+        assert_eq!(
+            Token::Identifier(id_name).to_string(),
+            format!("(Identifier, Name: {})", id_name)
+        );
+        let c = 'a';
+        let reserved_token = ReservedToken::Char(c);
+        assert_eq!(
+            Token::Reserved(&reserved_token).to_string(),
+            format!("(Reserved Char, Value: '{}')", c)
+        );
+        let c = '\n';
+        let reserved_token = ReservedToken::Char(c);
+        assert_eq!(
+            Token::Reserved(&reserved_token).to_string(),
+            format!("(Reserved Char, Value: '\\n')")
+        );
+        let keyword = "return";
+        let reserved_token = ReservedToken::Keyword(keyword);
+        assert_eq!(
+            Token::Reserved(&reserved_token).to_string(),
+            format!("(Keyword, Name: {})", keyword)
+        );
+        let keyword = "mut";
+        let reserved_token = ReservedToken::Keyword(keyword);
+        assert_eq!(
+            Token::Reserved(&reserved_token).to_string(),
+            format!("(Keyword, Name: {})", keyword)
+        );
+        let op = "++";
+        let op_info = OperatorInfo {
+            is_binary: false,
+            is_postfix: false,
+            is_unary: false,
+            is_prefix: false,
+            is_ternary: true,
+        };
+        let reserved_token = ReservedToken::Operator(op, op_info);
+        assert_eq!(
+            Token::Reserved(&reserved_token).to_string(),
+            format!("(Operator, Value: '{}')", op)
+        );
+        let whole_number = "3";
+        let fractional_part = "1415";
+        let num_info = NumberInfo {
+            whole_number,
+            fractional_part: Some(fractional_part),
+        };
+        assert_eq!(
+            Token::Number(num_info).to_string(),
+            format!(
+                "(Number, whole number: {}, fractional part: {})",
+                whole_number, fractional_part
+            )
+        );
+        let char_literal = "'a'";
+        assert_eq!(
+            Token::Char(char_literal).to_string(),
+            format!("(Char Literal, Value: {})", char_literal)
+        );
+        let char_literal = "'\\n'";
+        assert_eq!(
+            Token::Char(char_literal).to_string(),
+            format!("(Char Literal, Value: {})", char_literal)
+        );
+        let str_literal = "\"This is a test.\"";
+        assert_eq!(
+            Token::Str(str_literal).to_string(),
+            format!("(String Literal, Value: {})", str_literal)
+        );
+    }
+}
