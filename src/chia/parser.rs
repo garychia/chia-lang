@@ -274,7 +274,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     fn parse_expr(&mut self) -> Result<Box<ASTNode<'a, 'b>>, ParserError<'a, 'b>> {
         let mut operands = Vec::new();
-        let mut operators = Vec::new();
+        let mut operators: Vec<&'a ReservedToken<'b>> = Vec::new();
         let mut operand_expected = true;
         let last_idx = self.token_idx;
         while self.peek().is_some() {
@@ -291,14 +291,9 @@ impl<'a, 'b> Parser<'a, 'b> {
                     }
                     operands.push(operand_node);
                 } else {
-                    self.token_idx = last_idx;
-                    return Err(ParserError {
-                        description: format!("Expected an operand."),
-                        token: self.peek(),
-                    });
+                    break;
                 }
             } else {
-                let token = self.peek();
                 let mut succesful = false;
                 if let Some(token) = self.peek() {
                     match token {
@@ -307,6 +302,18 @@ impl<'a, 'b> Parser<'a, 'b> {
                                 if info.is_binary {
                                     succesful = true;
                                     self.consume();
+                                    while let Some(other_op_token) = operators.last() {
+                                        match other_op_token {
+                                            ReservedToken::Operator(_, other_info) => {
+                                                if other_info.precedence.unwrap() <= info.precedence.unwrap() {
+                                                    let operand1 = operands.pop().unwrap();
+                                                    let operand2 = operands.pop().unwrap();
+                                                    operands.push(Box::new(ASTNode::BinaryOperation(other_op_token, operand1, operand2)));
+                                                }
+                                            }
+                                            _ => panic!("Parser: operators are handled incorrectly."),
+                                        }
+                                    }
                                     operators.push(reserved_token);
                                 }
                             }
@@ -316,26 +323,25 @@ impl<'a, 'b> Parser<'a, 'b> {
                     }
                 }
                 if !succesful {
-                    self.token_idx = last_idx;
-                    return Err(ParserError {
-                        description: format!("Expected an operator."),
-                        token: token,
-                    });
+                    break;
                 }
             }
-            self.consume();
             operand_expected = !operand_expected;
         }
         if operand_expected {
+            let token = self.peek();
             self.token_idx = last_idx;
             return Err(ParserError {
                 description: format!("Expected an operand."),
-                token: self.peek(),
+                token
             });
         }
+        if operands.len() != operators.len() + 1 {
+            panic!("Parser: the number of operands or operators is not correct.");
+        }
         while let Some(op) = operators.pop() {
-            let operand1 = operands.pop().unwrap();
             let operand2 = operands.pop().unwrap();
+            let operand1 = operands.pop().unwrap();
             operands.push(Box::new(ASTNode::BinaryOperation(op, operand1, operand2)));
         }
         Ok(operands.pop().unwrap())
