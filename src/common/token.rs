@@ -122,6 +122,7 @@ mod tests {
             is_unary: false,
             is_prefix: false,
             is_ternary: true,
+            precedence: None,
         };
         let reserved_token = ReservedToken::Operator(op, op_info);
         assert_eq!(
