@@ -118,9 +118,8 @@ mod tests {
         let op = "++";
         let op_info = OperatorInfo {
             is_binary: false,
-            is_postfix: false,
-            is_unary: false,
-            is_prefix: false,
+            is_postfix: true,
+            is_prefix: true,
             is_ternary: true,
             precedence: None,
         };

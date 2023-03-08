@@ -29,7 +29,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "!",
         OperatorInfo {
-            is_unary: true,
             is_prefix: true,
             is_postfix: false,
             is_binary: false,
@@ -40,7 +39,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "~",
         OperatorInfo {
-            is_unary: true,
             is_prefix: true,
             is_postfix: false,
             is_binary: false,
@@ -51,7 +49,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         ".",
         OperatorInfo {
-            is_unary: true,
             is_prefix: false,
             is_postfix: true,
             is_binary: false,
@@ -62,7 +59,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "::",
         OperatorInfo {
-            is_unary: true,
             is_prefix: false,
             is_postfix: true,
             is_binary: false,
@@ -73,7 +69,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "[",
         OperatorInfo {
-            is_unary: true,
             is_prefix: false,
             is_postfix: true,
             is_binary: false,
@@ -84,7 +79,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "]",
         OperatorInfo {
-            is_unary: true,
             is_prefix: false,
             is_postfix: true,
             is_binary: false,
@@ -95,7 +89,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "++",
         OperatorInfo {
-            is_unary: true,
             is_prefix: true,
             is_postfix: true,
             is_binary: false,
@@ -106,7 +99,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "--",
         OperatorInfo {
-            is_unary: true,
             is_prefix: true,
             is_postfix: true,
             is_binary: false,
@@ -117,7 +109,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -128,7 +119,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "==",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -139,7 +129,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "+",
         OperatorInfo {
-            is_unary: true,
             is_prefix: true,
             is_postfix: false,
             is_binary: true,
@@ -150,7 +139,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "-",
         OperatorInfo {
-            is_unary: true,
             is_prefix: true,
             is_postfix: false,
             is_binary: true,
@@ -161,7 +149,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "*",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -172,7 +159,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "/",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -183,7 +169,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "%",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -194,7 +179,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "&",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -205,7 +189,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "|",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -216,7 +199,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "^",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -227,7 +209,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         ">",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -238,7 +219,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "<",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -249,7 +229,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         ">=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -260,7 +239,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         ">>=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -271,7 +249,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "<=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -282,7 +259,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "<<=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -293,7 +269,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "!=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -304,7 +279,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "+=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -315,7 +289,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "-=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -326,7 +299,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "*=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -337,7 +309,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "/=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -348,7 +319,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "%=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -359,7 +329,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "||",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -370,7 +339,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "|=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -381,7 +349,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "&&",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -392,7 +359,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "&=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -403,7 +369,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "^=",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -414,7 +379,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "<<",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -425,7 +389,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         ">>",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: true,
@@ -436,7 +399,6 @@ const CHIA_RESERVED_TOKENS: [ReservedToken; 70] = [
     ReservedToken::Operator(
         "?",
         OperatorInfo {
-            is_unary: false,
             is_prefix: false,
             is_postfix: false,
             is_binary: false,
