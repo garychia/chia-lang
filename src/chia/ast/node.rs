@@ -191,6 +191,7 @@ pub enum ASTNode<'a, 'b> {
     Tuple(Vec<Box<ASTNode<'a, 'b>>>),
     Number(&'a Token<'a>),
     String(&'a Token<'a>),
+    Char(&'a Token<'a>),
     Identifier(&'a Token<'a>),
     Expression(Box<ASTNode<'a, 'b>>),
     Function(FnDef<'a, 'b>),
@@ -208,16 +209,40 @@ pub enum ASTNode<'a, 'b> {
 }
 
 impl<'a, 'b> ASTNode<'a, 'b> {
+    pub fn new_program(info: ProgramInfo<'a, 'b>) -> ASTNode<'a, 'b> {
+        Self::Program(info)
+    }
+
     pub fn new_type_def(type_def: TypeDef<'a, 'b>) -> ASTNode<'a, 'b> {
         Self::TypeDef(type_def)
+    }
+
+    pub fn new_struct_def(struct_def: StructDef<'a, 'b>) -> ASTNode<'a, 'b> {
+        Self::StructDef(struct_def)
+    }
+
+    pub fn new_enum_def(enum_def: EnumDef<'a, 'b>) -> ASTNode<'a, 'b> {
+        Self::EnumDef(enum_def)
     }
 
     pub fn new_type(type_info: TypeInfo<'a, 'b>) -> ASTNode<'a, 'b> {
         Self::Type(type_info)
     }
 
+    pub fn new_tuple(content: Vec<Box<ASTNode<'a, 'b>>>) -> ASTNode<'a, 'b> {
+        Self::Tuple(content)
+    }
+
     pub fn new_number(token: &'a Token<'a>) -> ASTNode<'a, 'b> {
         Self::Number(token)
+    }
+
+    pub fn new_string(token: &'a Token<'a>) -> ASTNode<'a, 'b> {
+        Self::String(token)
+    }
+
+    pub fn new_char(token: &'a Token<'a>) -> ASTNode<'a, 'b> {
+        Self::Char(token)
     }
 
     pub fn new_identifier(token: &'a Token<'a>) -> ASTNode<'a, 'b> {
@@ -246,5 +271,27 @@ impl<'a, 'b> ASTNode<'a, 'b> {
 
     pub fn new_control_flow(info: ControlFlowInfo<'a, 'b>) -> ASTNode<'a, 'b> {
         Self::ControlFlow(info)
+    }
+
+    pub fn new_prefix_operation(
+        operator: &'a ReservedToken<'b>,
+        operand: Box<ASTNode<'a, 'b>>,
+    ) -> ASTNode<'a, 'b> {
+        Self::PrefixOperation(operator, operand)
+    }
+
+    pub fn new_postfix_operation(
+        operator: &'a ReservedToken<'b>,
+        operand: Box<ASTNode<'a, 'b>>,
+    ) -> ASTNode<'a, 'b> {
+        Self::PostfixOperation(operator, operand)
+    }
+
+    pub fn new_binary_operation(
+        operator: &'a ReservedToken<'b>,
+        operand1: Box<ASTNode<'a, 'b>>,
+        operand2: Box<ASTNode<'a, 'b>>,
+    ) -> ASTNode<'a, 'b> {
+        Self::BinaryOperation(operator, operand1, operand2)
     }
 }

@@ -245,6 +245,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 }
                 Token::Number(_) => Some(Box::new(ASTNode::new_number(token))),
                 Token::Str(_) => Some(Box::new(ASTNode::String(token))),
+                Token::Char(_) => Some(Box::new(ASTNode::Char(token))),
                 _ => None,
             };
         }
@@ -299,19 +300,32 @@ impl<'a, 'b> Parser<'a, 'b> {
                     match token {
                         Token::Reserved(reserved_token) => match reserved_token {
                             ReservedToken::Operator(_, info) => {
-                                if info.is_binary {
+                                if info.is_binary || info.is_ternary {
                                     succesful = true;
                                     self.consume();
-                                    while let Some(other_op_token) = operators.last() {
+                                    while let Some(other_op_token) = operators.pop() {
                                         match other_op_token {
                                             ReservedToken::Operator(_, other_info) => {
-                                                if other_info.precedence.unwrap() <= info.precedence.unwrap() {
+                                                if other_info.precedence.unwrap()
+                                                    <= info.precedence.unwrap()
+                                                {
                                                     let operand1 = operands.pop().unwrap();
                                                     let operand2 = operands.pop().unwrap();
-                                                    operands.push(Box::new(ASTNode::BinaryOperation(other_op_token, operand1, operand2)));
+                                                    operands.push(Box::new(
+                                                        ASTNode::BinaryOperation(
+                                                            other_op_token,
+                                                            operand1,
+                                                            operand2,
+                                                        ),
+                                                    ));
+                                                } else {
+                                                    operators.push(other_op_token);
+                                                    break;
                                                 }
                                             }
-                                            _ => panic!("Parser: operators are handled incorrectly."),
+                                            _ => {
+                                                panic!("Parser: operators are handled incorrectly.")
+                                            }
                                         }
                                     }
                                     operators.push(reserved_token);
@@ -333,7 +347,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             self.token_idx = last_idx;
             return Err(ParserError {
                 description: format!("Expected an operand."),
-                token
+                token,
             });
         }
         if operands.len() != operators.len() + 1 {
