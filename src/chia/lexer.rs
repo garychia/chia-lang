@@ -332,3 +332,35 @@ impl<'a> Lexer<'a> {
         Ok(None)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::common::position::{Position, PositionRange};
+
+    use super::LexerError;
+
+    #[test]
+    fn test_lexer_error_to_string() {
+        let description = "TEST";
+        let range = PositionRange {
+            start: Position {
+                line: 1,
+                column: 24,
+                index: 30,
+            },
+            end: Position {
+                line: 2,
+                column: 2,
+                index: 78,
+            },
+        };
+        assert_eq!(
+            LexerError {
+                description: String::from(description),
+                position_range: range.clone(),
+            }
+            .to_string(),
+            format!("{} (Position: {})", description, range.to_string())
+        );
+    }
+}
