@@ -52,7 +52,7 @@ impl<'a> Lexer<'a> {
 
     fn read_until(
         &mut self,
-        f: fn(Option<char>, char) -> bool,
+        condition: fn(Option<char>, char) -> bool,
         until_end: bool,
     ) -> Option<PositionRange> {
         let start_pos = self.position.clone();
@@ -62,13 +62,13 @@ impl<'a> Lexer<'a> {
         while let Some(current) = self.peek() {
             last_pos = self.position.clone();
             self.consume();
-            if f(last_char, current) {
+            if condition(last_char, current) {
                 found = true;
                 break;
             }
             last_char = Some(current);
         }
-        if found || !found && until_end {
+        if found || until_end {
             return Some(PositionRange {
                 start: start_pos,
                 end: last_pos,
@@ -337,7 +337,7 @@ impl<'a> Lexer<'a> {
 mod tests {
     use crate::common::position::{Position, PositionRange};
 
-    use super::LexerError;
+    use super::{Lexer, LexerError};
 
     #[test]
     fn test_lexer_error_to_string() {
@@ -362,5 +362,54 @@ mod tests {
             .to_string(),
             format!("{} (Position: {})", description, range.to_string())
         );
+    }
+
+    #[test]
+    fn test_lexer_peek_and_consume() {
+        let program = "() my_func();\r\n/* TESTING */";
+        let mut lexer = Lexer::new(program);
+        for c in program.chars() {
+            assert_eq!(lexer.peek(), Some(c));
+            lexer.consume();
+        }
+        assert_eq!(lexer.peek(), None);
+    }
+
+    #[test]
+    fn test_lexer_read_until() {
+        let program = "\"This is a string.\\\"abc\"";
+        let start_pos = Position::new();
+        let mut end_pos = Position::new();
+        end_pos.index = program.len() - 1;
+        let end_pos = end_pos;
+
+        let mut lexer = Lexer::new(program);
+        let condition = |last_c, c| match last_c {
+            Some(last_c) => last_c != '\\' && c == '"',
+            _ => c == '"',
+        };
+        let result = lexer.read_until(condition, false);
+        assert!(result.is_some());
+        let result = result.unwrap();
+        assert_eq!(result.start.index, start_pos.index);
+        assert_eq!(result.end.index, start_pos.index);
+
+        let mut lexer = Lexer::new(program);
+        lexer.consume();
+        let result = lexer.read_until(condition, false);
+        assert!(result.is_some());
+        let result = result.unwrap();
+        assert_eq!(result.start.index, start_pos.index + 1);
+        assert_eq!(result.end.index, end_pos.index);
+
+        let mut lexer = Lexer::new(program);
+        let condition = |_, c| c == ';';
+        assert!(lexer.read_until(condition, false).is_none());
+        let mut lexer = Lexer::new(program);
+        let result = lexer.read_until(condition, true);
+        assert!(result.is_some());
+        let result = result.unwrap();
+        assert_eq!(result.start.index, start_pos.index);
+        assert_eq!(result.end.index, end_pos.index);
     }
 }
