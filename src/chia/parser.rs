@@ -45,38 +45,45 @@ impl<'a, 'b> Parser<'a, 'b> {
             }
         }
         let mut inner_types = Vec::new();
+        let mut expect_type = false;
         loop {
-            let mut reach_end = false;
             let token = self.peek();
             match token {
-                Some(Token::Reserved(ReservedToken::Char(')'))) => reach_end = true,
-                Some(Token::Reserved(ReservedToken::Char(','))) => {
-                    if inner_types.is_empty() {
+                Some(Token::Reserved(ReservedToken::Char(')'))) => {
+                    if expect_type {
                         self.token_idx = last_idx;
                         return Err(ParserError {
                             description: format!("Expected an identifier."),
                             token,
                         });
                     }
+                    self.consume();
+                    break;
                 }
-                _ => {
-                    self.token_idx = last_idx;
-                    return Err(ParserError {
-                        description: format!("Expected ')' or ','."),
-                        token,
-                    });
+                Some(Token::Reserved(ReservedToken::Char(','))) => {
+                    if inner_types.is_empty() || expect_type {
+                        self.token_idx = last_idx;
+                        return Err(ParserError {
+                            description: format!("Expected an identifier."),
+                            token,
+                        });
+                    }
+                    expect_type = true;
+                    self.consume();
                 }
-            }
-            self.consume();
-            if reach_end {
-                break;
-            }
-            match self.parse_type() {
-                Ok(node) => inner_types.push(node),
-                Err(err) => {
-                    self.token_idx = last_idx;
-                    return Err(err);
-                }
+                _ => match self.parse_type() {
+                    Ok(node) => {
+                        expect_type = false;
+                        inner_types.push(node)
+                    }
+                    _ => {
+                        self.token_idx = last_idx;
+                        return Err(ParserError {
+                            description: format!("Expected ')' or ','."),
+                            token,
+                        });
+                    }
+                },
             }
         }
         Ok(Box::new(ASTNode::Tuple(inner_types)))
@@ -489,33 +496,88 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_decl(&mut self) -> Result<Box<ASTNode<'a, 'b>>, ParserError<'a, 'b>> {
+        let last_idx = self.token_idx;
         let type_id_result = self.parse_type_identifier();
         match type_id_result {
-            Err(err) => Err(err),
+            Err(err) => {
+                self.token_idx = last_idx;
+                Err(err)
+            }
             Ok((type_found, id)) => match self.peek() {
                 Some(Token::Reserved(ReservedToken::Char('('))) => match self.parse_arg_list() {
                     Ok(args) => Ok(Box::new(ASTNode::new_function(FnDef::new(
                         type_found, id, args, None,
                     )))),
-                    Err(err) => Err(err),
+                    Err(err) => {
+                        self.token_idx = last_idx;
+                        Err(err)
+                    }
                 },
-                Some(Token::Reserved(ReservedToken::Operator("=", _))) => Err(ParserError {
-                    description: format!("Not implemented"),
-                    token: None,
-                }),
+                Some(Token::Reserved(ReservedToken::Operator("=", _))) => {
+                    self.consume();
+                    match self.parse_expr() {
+                        Ok(expr) => {
+                            match self.peek() {
+                                Some(Token::Reserved(ReservedToken::Char(';'))) => self.consume(),
+                                _ => {
+                                    let token = self.peek();
+                                    self.token_idx = last_idx;
+                                    return Err(ParserError {
+                                        description: format!("Expected ';'."),
+                                        token,
+                                    });
+                                }
+                            }
+                            Ok(Box::new(ASTNode::new_variable(VarDef::new(
+                                TypeVarPair::new(type_found, id),
+                                Some(expr),
+                            ))))
+                        }
+                        Err(err) => {
+                            self.token_idx = last_idx;
+                            Err(err)
+                        }
+                    }
+                }
                 Some(Token::Reserved(ReservedToken::Operator(";", _))) => Ok(Box::new(
                     ASTNode::new_variable(VarDef::new(TypeVarPair::new(type_found, id), None)),
                 )),
-                _ => Err(ParserError {
-                    description: format!("Expected ';', '=' or '('."),
-                    token: self.peek(),
-                }),
+                _ => {
+                    self.token_idx = last_idx;
+                    Err(ParserError {
+                        description: format!("Expected ';', '=' or '('."),
+                        token: self.peek(),
+                    })
+                }
             },
         }
     }
 
-    pub fn parse(&mut self) -> ASTNode<'a, 'b> {
+    pub fn parse(&mut self) -> Result<ASTNode<'a, 'b>, Vec<ParserError>> {
         let mut definitions = Vec::new();
-        ASTNode::Program(ProgramInfo::new(self.program_name.clone(), definitions))
+        let mut errors = Vec::new();
+        while self.peek().is_some() {
+            match self.parse_decl() {
+                Ok(node) => definitions.push(node),
+                Err(err) => {
+                    errors.push(err);
+                    while let Some(c) = self.peek() {
+                        match c {
+                            Token::Reserved(&ReservedToken::Char(';')) => break,
+                            _ => self.consume(),
+                        }
+                    }
+                    self.consume();
+                }
+            }
+        }
+        if errors.is_empty() {
+            Ok(ASTNode::Program(ProgramInfo::new(
+                self.program_name.clone(),
+                definitions,
+            )))
+        } else {
+            Err(errors)
+        }
     }
 }
