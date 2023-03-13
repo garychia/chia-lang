@@ -7,6 +7,12 @@ pub struct ParserError<'a, 'b> {
     token: Option<&'a Token<'b>>,
 }
 
+impl<'a, 'b> ParserError<'a, 'b> {
+    pub fn new(description: String, token: Option<&'a Token<'b>>) -> ParserError<'a, 'b> {
+        ParserError { description, token }
+    }
+}
+
 pub struct Parser<'a, 'b> {
     program_name: String,
     token_idx: usize,
@@ -30,7 +36,16 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn consume(&mut self) {
-        self.token_idx += 1;
+        if self.peek().is_some() {
+            self.token_idx += 1;
+        }
+    }
+
+    fn generate_expect_error(
+        expected_item: &str,
+        token: Option<&'a Token<'b>>,
+    ) -> ParserError<'a, 'b> {
+        ParserError::new(format!("Expected {}.", expected_item), token)
     }
 
     fn parse_tuple_type(&mut self) -> Result<Box<ASTNode<'a, 'b>>, ParserError<'a, 'b>> {
@@ -38,24 +53,18 @@ impl<'a, 'b> Parser<'a, 'b> {
         match self.peek() {
             Some(Token::Reserved(ReservedToken::Char('('))) => self.consume(),
             _ => {
-                return Err(ParserError {
-                    description: format!("Expected a left parenthesis."),
-                    token: self.peek(),
-                })
+                return Err(Self::generate_expect_error("left paranthesis", self.peek()));
             }
         }
         let mut inner_types = Vec::new();
-        let mut expect_type = false;
+        let mut expect_type = true;
         loop {
             let token = self.peek();
             match token {
                 Some(Token::Reserved(ReservedToken::Char(')'))) => {
-                    if expect_type {
+                    if expect_type && !inner_types.is_empty() {
                         self.token_idx = last_idx;
-                        return Err(ParserError {
-                            description: format!("Expected an identifier."),
-                            token,
-                        });
+                        return Err(Self::generate_expect_error("identifier", token));
                     }
                     self.consume();
                     break;
@@ -63,27 +72,27 @@ impl<'a, 'b> Parser<'a, 'b> {
                 Some(Token::Reserved(ReservedToken::Char(','))) => {
                     if inner_types.is_empty() || expect_type {
                         self.token_idx = last_idx;
-                        return Err(ParserError {
-                            description: format!("Expected an identifier."),
-                            token,
-                        });
+                        return Err(Self::generate_expect_error("identifier", token));
                     }
                     expect_type = true;
                     self.consume();
                 }
-                _ => match self.parse_type() {
-                    Ok(node) => {
-                        expect_type = false;
-                        inner_types.push(node)
-                    }
-                    _ => {
+                _ => {
+                    if !expect_type {
                         self.token_idx = last_idx;
-                        return Err(ParserError {
-                            description: format!("Expected ')' or ','."),
-                            token,
-                        });
+                        return Err(Self::generate_expect_error("')' or ','", token));
                     }
-                },
+                    match self.parse_type() {
+                        Ok(node) => {
+                            expect_type = false;
+                            inner_types.push(node)
+                        }
+                        _ => {
+                            self.token_idx = last_idx;
+                            return Err(Self::generate_expect_error("')' or ','", token));
+                        }
+                    }
+                }
             }
         }
         Ok(Box::new(ASTNode::Tuple(inner_types)))
@@ -107,7 +116,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         match self.peek() {
             Some(token) => match token {
                 Token::Reserved(ReservedToken::Keyword(token_keyword)) => {
-                    if token_keyword.eq(&keyword) {
+                    if token_keyword == &keyword {
                         self.consume();
                         return Some(token);
                     }
@@ -139,10 +148,8 @@ impl<'a, 'b> Parser<'a, 'b> {
         match token {
             Some(Token::Reserved(ReservedToken::Char('('))) => self.consume(),
             _ => {
-                return Err(ParserError {
-                    description: format!("Expected '('."),
-                    token,
-                })
+                self.token_idx = last_idx;
+                return Err(Self::generate_expect_error("'('", token));
             }
         }
         let inner = self.parse_expr();
@@ -158,10 +165,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             Some(Token::Reserved(ReservedToken::Char(')'))) => self.consume(),
             _ => {
                 self.token_idx = last_idx;
-                return Err(ParserError {
-                    description: format!("Expected ')'."),
-                    token,
-                });
+                return Err(Self::generate_expect_error("')'", token));
             }
         }
         inner
@@ -185,44 +189,42 @@ impl<'a, 'b> Parser<'a, 'b> {
         prefix_operators
     }
 
-    fn parse_tuple(&mut self) -> Result<Vec<Box<ASTNode<'a, 'b>>>, ParserError<'a, 'b>> {
+    fn parse_tuple_expr(&mut self) -> Result<Vec<Box<ASTNode<'a, 'b>>>, ParserError<'a, 'b>> {
         let last_idx = self.token_idx;
         match self.peek() {
             Some(Token::Reserved(ReservedToken::Char('('))) => self.consume(),
             _ => {
-                return Err(ParserError {
-                    description: format!("Expected '('."),
-                    token: self.peek(),
-                })
+                return Err(Self::generate_expect_error("'('", self.peek()));
             }
         }
         let mut arguments = Vec::new();
-        let mut reach_end = false;
-        while !reach_end {
-            let mut failed = false;
+        let mut expect_expr = true;
+        loop {
             let token = self.peek();
-            let parser_err = Err(ParserError {
-                description: format!("Expected ',' or ')'."),
-                token,
-            });
             match token {
-                Some(Token::Reserved(ReservedToken::Char(')'))) => reach_end = true,
-                Some(Token::Reserved(ReservedToken::Char(','))) => failed = arguments.is_empty(),
-                _ => failed = true,
-            }
-            if failed {
-                return parser_err;
-            }
-            self.consume();
-            if reach_end {
-                break;
-            }
-            match self.parse_expr() {
-                Ok(arg) => arguments.push(arg),
-                Err(err) => {
-                    self.token_idx = last_idx;
-                    return Err(err);
+                Some(Token::Reserved(ReservedToken::Char(')'))) => {
+                    if expect_expr && !arguments.is_empty() {
+                        self.token_idx = last_idx;
+                        return Err(Self::generate_expect_error("expression", token));
+                    }
+                    self.consume();
+                    break;
                 }
+                Some(Token::Reserved(ReservedToken::Char(','))) => {
+                    if expect_expr {
+                        self.token_idx = last_idx;
+                        return Err(Self::generate_expect_error("expression", token));
+                    }
+                    self.consume();
+                    expect_expr = true;
+                }
+                _ => match self.parse_expr() {
+                    Ok(arg) => arguments.push(arg),
+                    Err(err) => {
+                        self.token_idx = last_idx;
+                        return Err(err);
+                    }
+                },
             }
         }
         Ok(arguments)
@@ -237,7 +239,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                     self.consume();
                     match self.peek() {
                         Some(Token::Reserved(ReservedToken::Char('('))) => {
-                            match self.parse_tuple() {
+                            match self.parse_tuple_expr() {
                                 Ok(args) => Some(Box::new(ASTNode::new_function_call(
                                     FnCall::new(Box::new(ASTNode::new_identifier(token)), args),
                                 ))),
@@ -251,8 +253,8 @@ impl<'a, 'b> Parser<'a, 'b> {
                     }
                 }
                 Token::Number(_) => Some(Box::new(ASTNode::new_number(token))),
-                Token::Str(_) => Some(Box::new(ASTNode::String(token))),
-                Token::Char(_) => Some(Box::new(ASTNode::Char(token))),
+                Token::Str(_) => Some(Box::new(ASTNode::new_string(token))),
+                Token::Char(_) => Some(Box::new(ASTNode::new_char(token))),
                 _ => None,
             };
         }
@@ -316,8 +318,8 @@ impl<'a, 'b> Parser<'a, 'b> {
                                                 if other_info.precedence.unwrap()
                                                     <= info.precedence.unwrap()
                                                 {
-                                                    let operand1 = operands.pop().unwrap();
                                                     let operand2 = operands.pop().unwrap();
+                                                    let operand1 = operands.pop().unwrap();
                                                     operands.push(Box::new(
                                                         ASTNode::BinaryOperation(
                                                             other_op_token,
@@ -352,10 +354,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         if operand_expected {
             let token = self.peek();
             self.token_idx = last_idx;
-            return Err(ParserError {
-                description: format!("Expected an operand."),
-                token,
-            });
+            return Err(Self::generate_expect_error("operand", token));
         }
         if operands.len() != operators.len() + 1 {
             panic!("Parser: the number of operands or operators is not correct.");
